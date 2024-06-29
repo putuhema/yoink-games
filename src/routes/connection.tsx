@@ -39,6 +39,29 @@ const difficulty = [
   },
 ]
 
+const groups: Group[] = [
+  {
+    name: "homophones",
+    answer: ["to", "too", "two", "tue"],
+    difficulty: Difficulty.Straighforward
+  },
+  {
+    name: "place down",
+    answer: ["laid", "placed", "put", "sat"],
+    difficulty: Difficulty.Moderate
+  },
+  {
+    name: "___flower",
+    answer: ["may", "sun", "wall", "wild"],
+    difficulty: Difficulty.Challenging
+  },
+  {
+    name: "connect",
+    answer: ["couple", "tie", "unite", "wed"],
+    difficulty: Difficulty.Tricky
+  }
+]
+
 function Connection() {
   const [card, setCard] = useState<Array<string>>([])
   const [currentGuess, setCurrentGuess] = useState<Array<string>>([])
@@ -46,28 +69,7 @@ function Connection() {
   const [previousGuess, setPreviousGuess] = useState<Array<String[]>>([])
   const [answer, setAnswer] = useState<Group[]>([])
   const [isGuessInPrevGuess, setIsGuessInPrevGuess] = useState(false)
-  const groups: Group[] = [
-    {
-      name: "homophones",
-      answer: ["to", "too", "two", "tue"],
-      difficulty: Difficulty.Straighforward
-    },
-    {
-      name: "place down",
-      answer: ["laid", "placed", "put", "sat"],
-      difficulty: Difficulty.Moderate
-    },
-    {
-      name: "___flower",
-      answer: ["may", "sun", "wall", "wild"],
-      difficulty: Difficulty.Challenging
-    },
-    {
-      name: "connect",
-      answer: ["couple", "tie", "unite", "wed"],
-      difficulty: Difficulty.Tricky
-    }
-  ]
+  const [isWrong, setIsWrong] = useState(false)
 
   useEffect(() => {
     const newCard = groups.map(g => g.answer).flat()
@@ -75,6 +77,20 @@ function Connection() {
     setCard(suffledCard)
   }, [])
 
+  function handleOnPick(pickedWord: string) {
+    const isInCurrentGuess = currentGuess.includes(pickedWord)
+    const isInPreviousGuess = previousGuess.flat().includes(pickedWord)
+    if (isWrong && isInPreviousGuess) {
+      setIsWrong(false)
+    }
+    if (currentGuess.length < 4 || isInCurrentGuess) {
+      setCurrentGuess(prevCurrentGuess =>
+        prevCurrentGuess.includes(pickedWord) ?
+          prevCurrentGuess.filter(card => card != pickedWord) : [...prevCurrentGuess, pickedWord]
+      )
+    }
+    setIsGuessInPrevGuess(false)
+  }
 
   function handleOnSuffle<T>(array: T[]): T[] {
     const suffledArray = [...array]
@@ -143,9 +159,12 @@ function Connection() {
         setPreviousGuess([])
       }
 
+      setIsWrong(true)
       setMistakesRemaining(newMistakesRemaining)
     }
   }
+
+
   return (
     <>
       <div className='mt-24 p-8'>
@@ -173,15 +192,7 @@ function Connection() {
             <div className='grid grid-cols-4 gap-2'>
               {
                 card.map((text) => (
-                  <Card text={text} key={text} isPick={currentGuess.includes(text)} onPick={() => {
-                    if (currentGuess.length < 4 || currentGuess.includes(text)) {
-                      setCurrentGuess(prevCurrentGuess =>
-                        prevCurrentGuess.includes(text) ?
-                          prevCurrentGuess.filter(card => card != text) : [...prevCurrentGuess, text]
-                      )
-                    }
-                    setIsGuessInPrevGuess(false)
-                  }} />
+                  <Card text={text} key={text} isPick={currentGuess.includes(text)} onPick={() => { handleOnPick(text) }} />
                 ))
               }
             </div>
@@ -216,11 +227,12 @@ function Connection() {
               setCurrentGuess([])
               setAnswer([])
               setIsGuessInPrevGuess(false)
+              setIsWrong(false)
               setCard([
                 "two", "unite", "put", "too", "couple", "wall", "laid", "sat", "wed", "wild", "tue", "placed", "tie", "to", "sun", "may"
               ])
             }}>Reset</Button>
-            <Button disabled={currentGuess.length !== 4 || mistakesRemaining === 0} variant="outline" onClick={handleSubmit}>Submit</Button>
+            <Button disabled={currentGuess.length !== 4 || mistakesRemaining === 0 || isWrong} variant="outline" onClick={handleSubmit}>Submit</Button>
           </div>
         </div>
       </div>
