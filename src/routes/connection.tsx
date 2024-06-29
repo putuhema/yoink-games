@@ -4,6 +4,7 @@ import Card from '@/components/connection/card'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import toast, { Toaster } from 'react-hot-toast'
 
 export const Route = createFileRoute('/connection')({
   component: Connection
@@ -128,6 +129,7 @@ function Connection() {
   function handleSubmit() {
     if (!checkIfIsInPrevGuess()) {
       setIsGuessInPrevGuess(true)
+      toast("Already Guessed.")
       return
     }
 
@@ -197,13 +199,7 @@ function Connection() {
               }
             </div>
           </div>
-          {
-            isGuessInPrevGuess && (
-              <div className='w-full p-4 bg-black text-white'>
-                <p className='text-center'>Already Guessed</p>
-              </div>
-            )
-          }
+
           <div className='flex gap-4 items-center justify-center'>
             <p>Mistakes Remaining:</p>
             <div className='flex items-center gap-1'>
@@ -215,7 +211,7 @@ function Connection() {
             </div>
           </div>
 
-          <div className='flex gap-4 items-center justify-center'>
+          <div className='flex gap-4 items-center  justify-center'>
             <Button variant="outline" onClick={() => {
               const suffledCard = handleOnSuffle(card)
               setCard(suffledCard)
@@ -235,6 +231,14 @@ function Connection() {
             <Button disabled={currentGuess.length !== 4 || mistakesRemaining === 0 || isWrong} variant="outline" onClick={handleSubmit}>Submit</Button>
           </div>
         </div>
+        <Toaster toastOptions={{
+          className: '',
+          style: {
+            background: '#000000',
+            color: '#ffffff',
+            borderRadius: '4px'
+          }
+        }} />
       </div>
     </>
   )
