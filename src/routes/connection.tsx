@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import toast, { Toaster } from 'react-hot-toast'
+import { motion, useAnimation } from 'framer-motion'
 
 export const Route = createFileRoute('/connection')({
   component: Connection
@@ -69,7 +70,7 @@ function Connection() {
   const [mistakesRemaining, setMistakesRemaining] = useState(4)
   const [previousGuess, setPreviousGuess] = useState<Array<String[]>>([])
   const [answer, setAnswer] = useState<Group[]>([])
-  const [isGuessInPrevGuess, setIsGuessInPrevGuess] = useState(false)
+  const [disabledSubmit, setDisabledSubmit] = useState(false)
   const [isWrong, setIsWrong] = useState(false)
 
   useEffect(() => {
@@ -81,8 +82,9 @@ function Connection() {
   function handleOnPick(pickedWord: string) {
     const isInCurrentGuess = currentGuess.includes(pickedWord)
     const isInPreviousGuess = previousGuess.flat().includes(pickedWord)
-    if (isWrong && isInPreviousGuess) {
-      setIsWrong(false)
+    setIsWrong(false)
+    if (disabledSubmit && isInPreviousGuess) {
+      setDisabledSubmit(false)
     }
     if (currentGuess.length < 4 || isInCurrentGuess) {
       setCurrentGuess(prevCurrentGuess =>
@@ -90,7 +92,6 @@ function Connection() {
           prevCurrentGuess.filter(card => card != pickedWord) : [...prevCurrentGuess, pickedWord]
       )
     }
-    setIsGuessInPrevGuess(false)
   }
 
   function handleOnSuffle<T>(array: T[]): T[] {
@@ -128,7 +129,7 @@ function Connection() {
 
   function handleSubmit() {
     if (!checkIfIsInPrevGuess()) {
-      setIsGuessInPrevGuess(true)
+      setDisabledSubmit(true)
       toast("Already Guessed.")
       return
     }
@@ -154,6 +155,7 @@ function Connection() {
       setCurrentGuess([])
       setAnswer(updatedAnswer)
     } else {
+      setIsWrong(true)
       newMistakesRemaining -= 1
       if (newMistakesRemaining > 0) {
         setPreviousGuess([...previousGuess, currentGuess])
@@ -161,12 +163,69 @@ function Connection() {
         setPreviousGuess([])
       }
 
-      setIsWrong(true)
+      setDisabledSubmit(true)
       setMistakesRemaining(newMistakesRemaining)
     }
+
+
   }
 
+  // Framer motion animation
+  const DURATION = 0.1
+  const STAGGER_DELAY = 0.05
+  const FADE_DURATION = 1
+  const FADE_DELAY = 2
 
+
+  const itemVariants = {
+    initial: {
+      y: 0,
+      opacity: 1
+    },
+    jumpy: {
+      y: [0, -5, 5, -5, 0],
+    },
+    fadeOutAndShake: {
+      opacity: [1, 0.5, 0.5, 1],
+      x: [0, 5, -5, 5, 0],
+    }
+  };
+
+  const containerVariants = {
+    jumpy: {
+      transition: {
+        staggerChildren: STAGGER_DELAY,
+        delayChildren: 0.3,
+        x: {
+          duration: FADE_DURATION
+        },
+        opacity: {
+          times: [0, 0.2, 0.8, 1],
+          duration: FADE_DURATION + FADE_DELAY
+        },
+        y: {
+          type: 'spring',
+          stiffness: 200,
+          damping: 10,
+          duration: DURATION,
+        },
+      },
+    }
+  };
+
+  const controls = useAnimation()
+  useEffect(() => {
+    if (isWrong) {
+      const animateSequence = async () => {
+        await controls.start('jumpy');
+        await controls.start('fadeOutAndShake');
+      };
+      animateSequence();
+    } else {
+      controls.start('initial');
+    }
+
+  }, [isWrong, controls]);
   return (
     <>
       <div className='mt-24 p-8'>
@@ -191,13 +250,26 @@ function Connection() {
                 </div>
               ))
             }
-            <div className='grid grid-cols-4 gap-2'>
+            <motion.div
+              variants={containerVariants}
+              initial='initial'
+              animate={controls}
+              className='grid grid-cols-4 gap-2'>
               {
-                card.map((text) => (
-                  <Card text={text} key={text} isPick={currentGuess.includes(text)} onPick={() => { handleOnPick(text) }} />
-                ))
+                card.map((text) => {
+                  const isPick = currentGuess.includes(text)
+                  return (
+                    <Card
+                      variants={isPick ? itemVariants : {}}
+                      text={text} key={text}
+                      isPick={isPick}
+                      onPick={() => { handleOnPick(text) }} />
+                  )
+
+                }
+                )
               }
-            </div>
+            </motion.div>
           </div>
 
           <div className='flex gap-4 items-center justify-center'>
@@ -222,13 +294,12 @@ function Connection() {
               setPreviousGuess([])
               setCurrentGuess([])
               setAnswer([])
-              setIsGuessInPrevGuess(false)
-              setIsWrong(false)
+              setDisabledSubmit(false)
               setCard([
                 "two", "unite", "put", "too", "couple", "wall", "laid", "sat", "wed", "wild", "tue", "placed", "tie", "to", "sun", "may"
               ])
             }}>Reset</Button>
-            <Button disabled={currentGuess.length !== 4 || mistakesRemaining === 0 || isWrong} variant="outline" onClick={handleSubmit}>Submit</Button>
+            <Button disabled={currentGuess.length !== 4 || mistakesRemaining === 0 || disabledSubmit} variant="outline" onClick={handleSubmit}>Submit</Button>
           </div>
         </div>
         <Toaster toastOptions={{

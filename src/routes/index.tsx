@@ -17,6 +17,7 @@ function Index() {
         <p className="text-center font-bold">More Games</p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 justify-center mx-auto py-8 w-full">
           <GamesCard link='connection' bgColor="bg-yellow-300" title="Connection" desc="group words that share a common thread." />
+          <GamesCard link='test' bgColor="bg-purple-300" title="Test" desc="group words that share a common thread." />
         </div>
       </div>
     </>

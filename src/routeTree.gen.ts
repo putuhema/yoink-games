@@ -11,10 +11,16 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as TestImport } from './routes/test'
 import { Route as ConnectionImport } from './routes/connection'
 import { Route as IndexImport } from './routes/index'
 
 // Create/Update Routes
+
+const TestRoute = TestImport.update({
+  path: '/test',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const ConnectionRoute = ConnectionImport.update({
   path: '/connection',
@@ -44,12 +50,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectionImport
       parentRoute: typeof rootRoute
     }
+    '/test': {
+      id: '/test'
+      path: '/test'
+      fullPath: '/test'
+      preLoaderRoute: typeof TestImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren({ IndexRoute, ConnectionRoute })
+export const routeTree = rootRoute.addChildren({
+  IndexRoute,
+  ConnectionRoute,
+  TestRoute,
+})
 
 /* prettier-ignore-end */
 
@@ -60,7 +77,8 @@ export const routeTree = rootRoute.addChildren({ IndexRoute, ConnectionRoute })
       "filePath": "__root.tsx",
       "children": [
         "/",
-        "/connection"
+        "/connection",
+        "/test"
       ]
     },
     "/": {
@@ -68,6 +86,9 @@ export const routeTree = rootRoute.addChildren({ IndexRoute, ConnectionRoute })
     },
     "/connection": {
       "filePath": "connection.tsx"
+    },
+    "/test": {
+      "filePath": "test.tsx"
     }
   }
 }
