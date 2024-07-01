@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { format } from "date-fns"
 import Card from '@/components/connection/card'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import toast, { Toaster } from 'react-hot-toast'
@@ -22,26 +22,25 @@ type Group = {
   difficulty: Difficulty;
 }
 
-const difficulty = [
-  {
-    level: "straightforward",
-    color: "bg-yellow-300"
-  },
-  {
-    level: "moderate",
-    color: "bg-green-300"
-  },
-  {
-    level: "challenging",
-    color: "bg-blue-300"
-  },
-  {
-    level: "tricky",
-    color: "bg-purple-300"
-  },
+const DIFFICULTY_COLOR = [{
+  level: "straightforward",
+  color: "bg-yellow-300"
+},
+{
+  level: "moderate",
+  color: "bg-green-300"
+},
+{
+  level: "challenging",
+  color: "bg-blue-300"
+},
+{
+  level: "tricky",
+  color: "bg-purple-300"
+},
 ]
 
-const groups: Group[] = [
+const GROUPS: Group[] = [
   {
     name: "homophones",
     answer: ["to", "too", "two", "tue"],
@@ -64,46 +63,68 @@ const groups: Group[] = [
   }
 ]
 
-function Connection() {
-  const [card, setCard] = useState<Array<string>>([])
-  const [currentGuess, setCurrentGuess] = useState<Array<string>>([])
-  const [mistakesRemaining, setMistakesRemaining] = useState(4)
-  const [previousGuess, setPreviousGuess] = useState<Array<String[]>>([])
-  const [answer, setAnswer] = useState<Group[]>([])
-  const [disabledSubmit, setDisabledSubmit] = useState(false)
-  const [isWrong, setIsWrong] = useState(false)
+type GameState = {
+  card: Array<string>;
+  currentGuess: Array<string>;
+  mistakesRemaining: number;
+  previousGuess: Array<Array<string>>;
+  answer: Array<Group>;
+  disabledSubmit: boolean;
+  isWrong: boolean;
+}
+
+function useConnectionGame() {
+  const [gameState, setGameState] = useState<GameState>({
+    card: [],
+    currentGuess: [],
+    mistakesRemaining: 4,
+    previousGuess: [],
+    answer: [],
+    disabledSubmit: false,
+    isWrong: false
+  })
+
+  //   function handleOnSuffle<T>(array: T[]): T[] {
+  //   const suffledArray = [...array]
+  //   for (let i = suffledArray.length - 1; i > 0; i--) {
+  //     const j = Math.floor(Math.random() * (i + 1));
+  //     [suffledArray[i], suffledArray[j]] = [suffledArray[j], suffledArray[i]]
+  //   }
+  //   return suffledArray
+  // }
+
+  const shuffleArray = useMemo(() => <T,>(array: T[]): T[] => {
+    return [...array].sort(() => Math.random() - 0.5);
+  }, []);
 
   useEffect(() => {
-    const newCard = groups.map(g => g.answer).flat()
-    const suffledCard = handleOnSuffle(newCard)
-    setCard(suffledCard)
-  }, [])
+    const newCard = shuffleArray(GROUPS.flatMap(g => g.answer));
+    setGameState(prev => ({ ...prev, card: newCard }));
+  }, [shuffleArray]);
+
+  function handleOnSuffle() {
+    const newCard = shuffleArray(GROUPS.flatMap(g => g.answer))
+    setGameState(prev => ({ ...prev, card: newCard }))
+  }
 
   function handleOnPick(pickedWord: string) {
+    const { currentGuess, previousGuess, disabledSubmit } = gameState;
     const isInCurrentGuess = currentGuess.includes(pickedWord)
     const isInPreviousGuess = previousGuess.flat().includes(pickedWord)
-    setIsWrong(false)
+    setGameState({ ...gameState, isWrong: false })
     if (disabledSubmit && isInPreviousGuess) {
-      setDisabledSubmit(false)
+      setGameState({ ...gameState, disabledSubmit: false })
     }
     if (currentGuess.length < 4 || isInCurrentGuess) {
-      setCurrentGuess(prevCurrentGuess =>
-        prevCurrentGuess.includes(pickedWord) ?
-          prevCurrentGuess.filter(card => card != pickedWord) : [...prevCurrentGuess, pickedWord]
-      )
+      setGameState(prevGameState => ({
+        ...prevGameState,
+        currentGuess: prevGameState.currentGuess.includes(pickedWord) ?
+          prevGameState.currentGuess.filter(card => card != pickedWord) : [...prevGameState.currentGuess, pickedWord]
+      }))
     }
   }
 
-  function handleOnSuffle<T>(array: T[]): T[] {
-    const suffledArray = [...array]
-    for (let i = suffledArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [suffledArray[i], suffledArray[j]] = [suffledArray[j], suffledArray[i]]
-    }
-    return suffledArray
-  }
-
-  function checkAnswer<T>(array1: T[], array2: T[]): boolean {
+  function isElementEqual<T>(array1: T[], array2: T[]): boolean {
     if (array1.length !== array2.length) {
       return false
     }
@@ -119,8 +140,8 @@ function Connection() {
   }
 
   function checkIfIsInPrevGuess() {
-    for (let i = 0; i < previousGuess.length; i++) {
-      if (checkAnswer(previousGuess[i], currentGuess)) {
+    for (let i = 0; i < gameState.previousGuess.length; i++) {
+      if (isElementEqual(gameState.previousGuess[i], gameState.currentGuess)) {
         return false
       }
     }
@@ -129,18 +150,21 @@ function Connection() {
 
   function handleSubmit() {
     if (!checkIfIsInPrevGuess()) {
-      setDisabledSubmit(true)
+      setGameState(prevGameState => ({
+        ...prevGameState,
+        disabledSubmit: true
+      }))
       toast("Already Guessed.")
       return
     }
 
     let foundCorrectAnswer = false;
-    let newMistakesRemaining = mistakesRemaining
-    const updatedAnswer = [...answer]
+    let newMistakesRemaining = gameState.mistakesRemaining
+    const updatedAnswer = [...gameState.answer]
 
-    for (let i = 0; i < groups.length; i++) {
-      if (checkAnswer(groups[i].answer, currentGuess)) {
-        updatedAnswer.push(groups[i])
+    for (let i = 0; i < GROUPS.length; i++) {
+      if (isElementEqual(GROUPS[i].answer, gameState.currentGuess)) {
+        updatedAnswer.push(GROUPS[i])
         foundCorrectAnswer = true;
         break;
       }
@@ -148,74 +172,121 @@ function Connection() {
 
     if (foundCorrectAnswer) {
       const flattenedAnswer = updatedAnswer.map(a => a.answer).flat()
-      const filteredCard = card.filter(word => !flattenedAnswer.includes(word))
+      const filteredCard = gameState.card.filter(word => !flattenedAnswer.includes(word))
 
-      setCard(filteredCard)
-      setPreviousGuess([])
-      setCurrentGuess([])
-      setAnswer(updatedAnswer)
+      setGameState(prevGameState => ({
+        ...prevGameState,
+        card: filteredCard,
+        previousGuess: [],
+        currentGuess: [],
+        answer: updatedAnswer,
+      }))
     } else {
-      setIsWrong(true)
+      let previousGuess: Array<string[]> = []
       newMistakesRemaining -= 1
       if (newMistakesRemaining > 0) {
-        setPreviousGuess([...previousGuess, currentGuess])
+        previousGuess = [...gameState.previousGuess, gameState.currentGuess]
       } else {
-        setPreviousGuess([])
+        previousGuess = []
       }
 
-      setDisabledSubmit(true)
-      setMistakesRemaining(newMistakesRemaining)
+      setGameState(prevGameState => ({
+        ...prevGameState,
+        previousGuess,
+        isWrong: true,
+        disabledSubmit: true,
+        mistakesRemaining: newMistakesRemaining
+      }))
     }
-
 
   }
 
-  // Framer motion animation
-  const DURATION = 0.1
-  const STAGGER_DELAY = 0.05
-  const FADE_DURATION = 1
-  const FADE_DELAY = 2
+  function handleDeselectAll() {
+    setGameState(prevGameState => ({
+      ...prevGameState,
+      currentGuess: []
+    }))
+  }
 
+  function handleResetGameState() {
+    setGameState({
+      answer: [],
+      card: gameState.card,
+      currentGuess: [],
+      disabledSubmit: false,
+      isWrong: false,
+      mistakesRemaining: 4,
+      previousGuess: []
+    })
+  }
 
-  const itemVariants = {
-    initial: {
-      y: 0,
-      opacity: 1
-    },
-    jumpy: {
-      y: [0, -5, 5, -5, 0],
-    },
-    fadeOutAndShake: {
-      opacity: [1, 0.5, 0.5, 1],
-      x: [0, 5, -5, 5, 0],
-    }
-  };
+  return {
+    gameState,
+    handleOnPick,
+    handleOnSuffle,
+    handleSubmit,
+    handleDeselectAll,
+    handleResetGameState,
+  }
+}
 
-  const containerVariants = {
-    jumpy: {
-      transition: {
-        staggerChildren: STAGGER_DELAY,
-        delayChildren: 0.3,
-        x: {
-          duration: FADE_DURATION
-        },
-        opacity: {
-          times: [0, 0.2, 0.8, 1],
-          duration: FADE_DURATION + FADE_DELAY
-        },
-        y: {
-          type: 'spring',
-          stiffness: 200,
-          damping: 10,
-          duration: DURATION,
-        },
+const ANIMATION_CONFIG = {
+  DURATION: 0.08,
+  STAGGER_DELAY: 0.05,
+  FADE_DURATION: 1,
+  FADE_DELAY: 2
+}
+
+const itemVariants = {
+  initial: {
+    y: 0,
+    opacity: 1
+  },
+  jumpy: {
+    y: [0, -5, 5, -5, 0],
+  },
+  fadeOutAndShake: {
+    opacity: [1, 0.5, 0.5, 1],
+    x: [0, 5, -5, 5, 0],
+  }
+};
+
+const containerVariants = {
+  jumpy: {
+    transition: {
+      staggerChildren: ANIMATION_CONFIG.STAGGER_DELAY,
+      delayChildren: 0.3,
+      x: {
+        duration: ANIMATION_CONFIG.FADE_DURATION
       },
-    }
-  };
+      opacity: {
+        times: [0, 0.2, 0.8, 1],
+        duration: ANIMATION_CONFIG.FADE_DURATION + ANIMATION_CONFIG.FADE_DELAY
+      },
+      y: {
+        type: 'spring',
+        stiffness: 200,
+        damping: 10,
+        duration: ANIMATION_CONFIG.DURATION,
+      },
+    },
+  }
+};
 
+function Connection() {
+
+  const {
+    gameState,
+    handleOnPick,
+    handleOnSuffle,
+    handleSubmit,
+    handleDeselectAll,
+    handleResetGameState
+  } = useConnectionGame()
   const controls = useAnimation()
+
   useEffect(() => {
-    if (isWrong) {
+    if (gameState.isWrong) {
       const animateSequence = async () => {
         await controls.start('jumpy');
         await controls.start('fadeOutAndShake');
@@ -225,7 +296,7 @@ function Connection() {
       controls.start('initial');
     }
 
-  }, [isWrong, controls]);
+  }, [gameState.isWrong, controls]);
   return (
     <>
       <div className='mt-24 p-8'>
@@ -235,8 +306,8 @@ function Connection() {
           <p className='text-center mb-6'>Create four groups of four!</p>
           <div className='space-y-2'>
             {
-              answer.map(a => (
-                <div key={a.name} className={cn(difficulty[a.difficulty].color, "w-full rounded-md p-4 text-center",)}>
+              gameState.answer.map(a => (
+                <div key={a.name} className={cn(DIFFICULTY_COLOR[a.difficulty].color, "w-full rounded-md p-4 text-center",)}>
                   <p className='font-bold uppercase'>{a.name}</p>
                   <div className='flex justify-center gap-1 text-xl'>
                     {
@@ -256,8 +327,8 @@ function Connection() {
               animate={controls}
               className='grid grid-cols-4 gap-2'>
               {
-                card.map((text) => {
-                  const isPick = currentGuess.includes(text)
+                gameState.card.map((text) => {
+                  const isPick = gameState.currentGuess.includes(text)
                   return (
                     <Card
                       variants={isPick ? itemVariants : {}}
@@ -265,7 +336,6 @@ function Connection() {
                       isPick={isPick}
                       onPick={() => { handleOnPick(text) }} />
                   )
-
                 }
                 )
               }
@@ -276,7 +346,7 @@ function Connection() {
             <p>Mistakes Remaining:</p>
             <div className='flex items-center gap-1'>
               {
-                Array(mistakesRemaining).fill(0).map((_, i) =>
+                Array(gameState.mistakesRemaining).fill(0).map((_, i) =>
                   <div key={i} className='h-4 w-4 rounded-full bg-slate-500'></div>
                 )
               }
@@ -284,22 +354,14 @@ function Connection() {
           </div>
 
           <div className='flex gap-4 items-center  justify-center'>
-            <Button variant="outline" onClick={() => {
-              const suffledCard = handleOnSuffle(card)
-              setCard(suffledCard)
-            }} >Suffle</Button>
-            <Button variant="outline" onClick={() => setCurrentGuess([])}>Deselect All</Button>
-            <Button variant="outline" onClick={() => {
-              setMistakesRemaining(4)
-              setPreviousGuess([])
-              setCurrentGuess([])
-              setAnswer([])
-              setDisabledSubmit(false)
-              setCard([
-                "two", "unite", "put", "too", "couple", "wall", "laid", "sat", "wed", "wild", "tue", "placed", "tie", "to", "sun", "may"
-              ])
-            }}>Reset</Button>
-            <Button disabled={currentGuess.length !== 4 || mistakesRemaining === 0 || disabledSubmit} variant="outline" onClick={handleSubmit}>Submit</Button>
+            <Button variant="outline" onClick={handleOnSuffle} >Suffle</Button>
+            <Button variant="outline" onClick={handleDeselectAll}>Deselect All</Button>
+            <Button variant="outline" onClick={handleResetGameState}>Reset</Button>
+            <Button disabled={
+              gameState.currentGuess.length !== 4 ||
+              gameState.mistakesRemaining === 0 ||
+              gameState.disabledSubmit
+            } variant="outline" onClick={handleSubmit}>Submit</Button>
           </div>
         </div>
         <Toaster toastOptions={{
