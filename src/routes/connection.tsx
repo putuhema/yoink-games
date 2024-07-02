@@ -71,6 +71,7 @@ type GameState = {
   answer: Array<Group>;
   disabledSubmit: boolean;
   isWrong: boolean;
+  foundCorrect: boolean;
 }
 
 function useConnectionGame() {
@@ -81,17 +82,9 @@ function useConnectionGame() {
     previousGuess: [],
     answer: [],
     disabledSubmit: false,
-    isWrong: false
+    isWrong: false,
+    foundCorrect: false,
   })
-
-  //   function handleOnSuffle<T>(array: T[]): T[] {
-  //   const suffledArray = [...array]
-  //   for (let i = suffledArray.length - 1; i > 0; i--) {
-  //     const j = Math.floor(Math.random() * (i + 1));
-  //     [suffledArray[i], suffledArray[j]] = [suffledArray[j], suffledArray[i]]
-  //   }
-  //   return suffledArray
-  // }
 
   const shuffleArray = useMemo(() => <T,>(array: T[]): T[] => {
     return [...array].sort(() => Math.random() - 0.5);
@@ -103,7 +96,7 @@ function useConnectionGame() {
   }, [shuffleArray]);
 
   function handleOnSuffle() {
-    const newCard = shuffleArray(GROUPS.flatMap(g => g.answer))
+    const newCard = shuffleArray(gameState.card)
     setGameState(prev => ({ ...prev, card: newCard }))
   }
 
@@ -111,7 +104,7 @@ function useConnectionGame() {
     const { currentGuess, previousGuess, disabledSubmit } = gameState;
     const isInCurrentGuess = currentGuess.includes(pickedWord)
     const isInPreviousGuess = previousGuess.flat().includes(pickedWord)
-    setGameState({ ...gameState, isWrong: false })
+    setGameState({ ...gameState, isWrong: false, foundCorrect: false })
     if (disabledSubmit && isInPreviousGuess) {
       setGameState({ ...gameState, disabledSubmit: false })
     }
@@ -148,6 +141,7 @@ function useConnectionGame() {
     return true
   }
 
+  const controls = useAnimation()
   function handleSubmit() {
     if (!checkIfIsInPrevGuess()) {
       setGameState(prevGameState => ({
@@ -174,13 +168,17 @@ function useConnectionGame() {
       const flattenedAnswer = updatedAnswer.map(a => a.answer).flat()
       const filteredCard = gameState.card.filter(word => !flattenedAnswer.includes(word))
 
-      setGameState(prevGameState => ({
-        ...prevGameState,
-        card: filteredCard,
-        previousGuess: [],
-        currentGuess: [],
-        answer: updatedAnswer,
-      }))
+      controls.start("jumpy").then(() => {
+        setGameState(prevGameState => ({
+          ...prevGameState,
+          card: filteredCard,
+          previousGuess: [],
+          currentGuess: [],
+          answer: updatedAnswer,
+          foundCorrect: true,
+        }))
+      })
+
     } else {
       let previousGuess: Array<string[]> = []
       newMistakesRemaining -= 1
@@ -216,11 +214,13 @@ function useConnectionGame() {
       disabledSubmit: false,
       isWrong: false,
       mistakesRemaining: 4,
-      previousGuess: []
+      previousGuess: [],
+      foundCorrect: false
     })
   }
 
   return {
+    controls,
     gameState,
     handleOnPick,
     handleOnSuffle,
@@ -273,6 +273,7 @@ const containerVariants = {
   }
 };
 
+
 function Connection() {
 
   const {
@@ -281,22 +282,24 @@ function Connection() {
     handleOnSuffle,
     handleSubmit,
     handleDeselectAll,
-    handleResetGameState
+    handleResetGameState,
+    controls
   } = useConnectionGame()
-  const controls = useAnimation()
 
   useEffect(() => {
-    if (gameState.isWrong) {
-      const animateSequence = async () => {
+    const animateSequence = async () => {
+      if (gameState.isWrong) {
         await controls.start('jumpy');
         await controls.start('fadeOutAndShake');
-      };
-      animateSequence();
-    } else {
-      controls.start('initial');
-    }
+      } else {
+        await controls.start('initial');
+      }
+    };
 
-  }, [gameState.isWrong, controls]);
+    animateSequence();
+  }, [gameState.isWrong, gameState.foundCorrect, controls]);
+
+
   return (
     <>
       <div className='mt-24 p-8'>
@@ -305,34 +308,36 @@ function Connection() {
         <div className="xl:max-w-4xl mx-auto py-4 pt-10 space-y-5">
           <p className='text-center mb-6'>Create four groups of four!</p>
           <div className='space-y-2'>
-            {
-              gameState.answer.map(a => (
-                <div key={a.name} className={cn(DIFFICULTY_COLOR[a.difficulty].color, "w-full rounded-md p-4 text-center",)}>
-                  <p className='font-bold uppercase'>{a.name}</p>
-                  <div className='flex justify-center gap-1 text-xl'>
-                    {
-                      a.answer.map((an, i) => i === a.answer.length - 1 ? (
-                        <p key={an} className='uppercase'>{an}</p>
-                      ) :
-                        <p key={an} className='uppercase'>{an},</p>
-                      )
-                    }
-                  </div>
-                </div>
-              ))
-            }
+
             <motion.div
               variants={containerVariants}
               initial='initial'
               animate={controls}
               className='grid grid-cols-4 gap-2'>
               {
+                gameState.answer.map(a => (
+                  <motion.div layout key={a.name} className={cn(DIFFICULTY_COLOR[a.difficulty].color, "col-span-4 rounded-md p-4 text-center",)}>
+                    <p className='font-bold uppercase'>{a.name}</p>
+                    <div className='flex justify-center gap-1 text-xl'>
+                      {
+                        a.answer.map((an, i) => i === a.answer.length - 1 ? (
+                          <p key={an} className='uppercase'>{an}</p>
+                        ) :
+                          <p key={an} className='uppercase'>{an},</p>
+                        )
+                      }
+                    </div>
+                  </motion.div>
+                ))
+              }
+              {
                 gameState.card.map((text) => {
                   const isPick = gameState.currentGuess.includes(text)
                   return (
                     <Card
                       variants={isPick ? itemVariants : {}}
-                      text={text} key={text}
+                      text={text}
+                      key={text}
                       isPick={isPick}
                       onPick={() => { handleOnPick(text) }} />
                   )

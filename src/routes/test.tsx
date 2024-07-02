@@ -3,6 +3,9 @@ import { Button } from '@/components/ui/button'
 import { createFileRoute } from '@tanstack/react-router'
 import { motion, useAnimation, } from 'framer-motion'
 import { useEffect, useState } from 'react'
+import { RotateCw } from "lucide-react"
+import { cn } from '@/lib/utils'
+import { Box } from '@/components/playground/box'
 
 export const Route = createFileRoute('/test')({
   component: Test
@@ -66,31 +69,37 @@ function Test() {
     }
   }, [isAnimating, controls]);
   return (
-    <div className='mt-24 min-w-xl'>
-      <div className='w-max mx-auto'>
-        <motion.div
-          variants={containerVariants}
-          initial='initial'
-          animate={controls}
-          className='grid grid-cols-2 gap-2 p-2 border border-red-400 rounded-md'>
-          {
-            Array(4).fill(0).map((_, i) => (
-              <motion.div
-                key={i}
-                variants={itemVariants}
-                className='w-24 h-24 rounded-md bg-red-400'></motion.div>
-            ))
-          }
-        </motion.div>
-        <Button
-          className='mt-10'
-          onClick={() => {
-            setIsAnimating(true)
-            setTimeout(() => {
-              setIsAnimating(false)
-            }, (DURATION + STAGGER_DELAY * 3) * 1000)
-          }}>{isAnimating ? 'Animating...' : 'Start'}</Button>
+    <div className='mt-24 max-w-2xl mx-auto'>
+      <div className='grid grid-cols-2 lg:grid-cols-4 justify-center items-center gap-4'>
+        <div className='border relative'>
+          <motion.div
+            variants={containerVariants}
+            initial='initial'
+            animate={controls}
+            className='grid w-max grid-cols-2 gap-2 p-2 border border-red-400 rounded-md'>
+            {
+              Array(4).fill(0).map((_, i) => (
+                <motion.div
+                  key={i}
+                  variants={itemVariants}
+                  className='w-16 h-16 rounded-md bg-red-400'></motion.div>
+              ))
+            }
+          </motion.div>
+          <Button
+            className='absolute top-0 right-0'
+            size="icon"
+            onClick={() => {
+              setIsAnimating(true)
+              setTimeout(() => {
+                setIsAnimating(false)
+              }, (DURATION + STAGGER_DELAY * 3) * 1000)
+            }}> <RotateCw className={cn(isAnimating && 'animate-spin')} /> </Button>
+        </div>
         <Dice />
+        <div className='col-span-2'>
+          <Box />
+        </div>
       </div>
     </div>
   )
